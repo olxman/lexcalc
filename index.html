@@ -214,27 +214,35 @@ function App(){
   const [sq,setSq]=useState("");
   const lgR=useRef(null);
 
+  const fetchTO=(url,ms)=>{
+    const ctrl=new AbortController();
+    const id=setTimeout(()=>ctrl.abort(),ms);
+    return fetch(url,{signal:ctrl.signal,cache:"no-store"}).finally(()=>clearTimeout(id));
+  };
   const updUF=useCallback(async()=>{
     setUfL(true);setUfM("");
     const parse=d=>{if(d&&d.serie&&d.serie[0]&&d.serie[0].valor){setUF(d.serie[0].valor);setUfM("Actualizado: "+new Date(d.serie[0].fecha).toLocaleDateString("es-CL"));return true;}return false;};
     try{
-      const r=await fetch("https://mindicador.cl/api/uf",{cache:"no-store"});
-      if(!r.ok)throw new Error("HTTP "+r.status);
-      const d=await r.json();
-      if(!parse(d))throw new Error("Respuesta inesperada");
-    }catch(e1){
-      console.error("UF: fetch directo falló",e1);
       try{
-        const r2=await fetch("https://api.allorigins.win/raw?url="+encodeURIComponent("https://mindicador.cl/api/uf"),{cache:"no-store"});
-        if(!r2.ok)throw new Error("HTTP "+r2.status);
-        const d2=await r2.json();
-        if(!parse(d2))throw new Error("Respuesta inesperada (proxy)");
-      }catch(e2){
-        console.error("UF: fetch via proxy falló",e2);
-        setUfM("No se pudo conectar (posible bloqueo CORS/adblock). Ingrese el valor manualmente.");
+        const r=await fetchTO("https://mindicador.cl/api/uf",7000);
+        if(!r.ok)throw new Error("HTTP "+r.status);
+        const d=await r.json();
+        if(!parse(d))throw new Error("Respuesta inesperada");
+      }catch(e1){
+        console.error("UF: fetch directo falló",e1);
+        try{
+          const r2=await fetchTO("https://api.allorigins.win/raw?url="+encodeURIComponent("https://mindicador.cl/api/uf"),7000);
+          if(!r2.ok)throw new Error("HTTP "+r2.status);
+          const d2=await r2.json();
+          if(!parse(d2))throw new Error("Respuesta inesperada (proxy)");
+        }catch(e2){
+          console.error("UF: fetch via proxy falló",e2);
+          setUfM("No se pudo conectar (posible bloqueo CORS/adblock/timeout). Ingrese el valor manualmente.");
+        }
       }
+    } finally {
+      setUfL(false);
     }
-    setUfL(false);
   },[]);
 
   const honUF=svc?(svc.minUF+(svc.maxUF-svc.minUF)*(rg/100))*COMP[cp].factor:0;
